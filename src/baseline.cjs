@@ -1,18 +1,4 @@
-// Headless batch-experiment runner for jev_botsim.
-//
-// Reimplements the same mechanics as botsim.js (network, four-stage tick loop,
-// jev-mock Noul gates) without any DOM, so it can run many replications fast
-// and be scripted like a research experiment instead of watched in a browser.
-//
-// This is a SCOPED-DOWN reproduction of BotSim's experimental design (Ng &
-// Carley, JASSS 2025) -- not the full 3,675-run / n=15 / 1,000-agent sweep
-// from the paper. See results.md for exactly what was run and why, and for
-// the deviations from the paper's scale.
-
-const fs = require('fs');
-const path = require('path');
-
-// --- seeded RNG so every run is reproducible from its seed ---
+// Seeded probability model. Historical action and update rules are preserved.
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
@@ -76,6 +62,7 @@ function runOnce({ n, k, p, alpha1, alpha2, alpha3, maxTicks, flipThreshold, see
     bot.targets = Array.from({ length: nLinks }, () => Math.floor(rnd() * n));
   }
 
+  const history = [];
   let tickOfMajority = null;   // first tick Bad Humans > Good Humans
   let tickOfAllBad = null;     // first tick 100% Bad
   let decisions = 0;
@@ -131,6 +118,7 @@ function runOnce({ n, k, p, alpha1, alpha2, alpha3, maxTicks, flipThreshold, see
     for (const bot of bots) { bot.hasInfo = false; bot.infoPolarity = null; }
 
     const nBad = agents.reduce((s, a) => s + (a.belief === 'bad' ? 1 : 0), 0);
+    history.push({ step: tick, rumorAcceptingFraction: nBad / n });
     if (tickOfMajority === null && nBad > n / 2) tickOfMajority = tick;
     if (tickOfAllBad === null && nBad === n) { tickOfAllBad = tick; break; }
   }
@@ -138,85 +126,10 @@ function runOnce({ n, k, p, alpha1, alpha2, alpha3, maxTicks, flipThreshold, see
   const finalBad = agents.reduce((s, a) => s + (a.belief === 'bad' ? 1 : 0), 0);
   return {
     tickOfMajority, tickOfAllBad,
+    history,
     finalBadFraction: finalBad / n,
     decisions
   };
 }
 
-function mean(xs) { return xs.reduce((a, b) => a + b, 0) / xs.length; }
-function stdev(xs) {
-  const m = mean(xs);
-  return Math.sqrt(mean(xs.map(x => (x - m) ** 2)));
-}
-
-function summarize(runs) {
-  const majorities = runs.map(r => r.tickOfMajority).filter(v => v !== null);
-  const allBads = runs.map(r => r.tickOfAllBad).filter(v => v !== null);
-  return {
-    nRuns: runs.length,
-    majorityReachedRate: majorities.length / runs.length,
-    meanTicksToMajority: majorities.length ? mean(majorities) : null,
-    sdTicksToMajority: majorities.length ? stdev(majorities) : null,
-    allBadReachedRate: allBads.length / runs.length,
-    meanTicksToAllBad: allBads.length ? mean(allBads) : null,
-    sdTicksToAllBad: allBads.length ? stdev(allBads) : null,
-    meanFinalBadFraction: mean(runs.map(r => r.finalBadFraction))
-  };
-}
-
-// --- fixed simulation parameters for every experiment below ---
-const BASE = { n: 300, k: 6, p: 0.05, maxTicks: 100, flipThreshold: 6 };
-const N_REPS = 8; // scaled down from the paper's n=15 -- see results.md
-
-function sweep(paramName, values, fixed) {
-  return values.map(v => {
-    const runs = [];
-    for (let rep = 0; rep < N_REPS; rep++) {
-      const params = { ...BASE, ...fixed, [paramName]: v, seed: hashSeed(paramName, v, rep) };
-      runs.push(runOnce(params));
-    }
-    return { [paramName]: v, ...summarize(runs) };
-  });
-}
-
-function hashSeed(name, v, rep) {
-  const s = `${name}:${v}:${rep}`;
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
-
-function linspace(lo, hi, steps) {
-  return Array.from({ length: steps }, (_, i) => +(lo + (hi - lo) * (i / (steps - 1))).toFixed(3));
-}
-
-console.log('Running jev_botsim experiments (scoped-down reproduction of BotSim Experiments 1-3)...');
-
-const experiments = {};
-
-console.log('  Experiment 1: Bad Bot ratio (alpha1), no useful bots');
-experiments.exp1_badBotOnly = sweep('alpha1', linspace(0.1, 1.0, 6), { alpha2: 0, alpha3: 0 });
-
-console.log('  Experiment 2: Info-Correction Bot ratio (alpha2) at fixed alpha1=0.2');
-experiments.exp2_correctionBots = sweep('alpha2', linspace(0, 1.5, 6), { alpha1: 0.2, alpha3: 0 });
-
-console.log('  Experiment 3: Good Bot ratio (alpha3) at fixed alpha1=0.2');
-experiments.exp3_goodBots = sweep('alpha3', linspace(0, 2.0, 6), { alpha1: 0.2, alpha2: 0 });
-
-const outDir = __dirname;
-fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify({ base: BASE, nReps: N_REPS, experiments }, null, 2));
-
-// flat CSV across all three experiments
-const rows = [['experiment', 'alpha1', 'alpha2', 'alpha3', 'nRuns', 'majorityReachedRate', 'meanTicksToMajority', 'sdTicksToMajority', 'allBadReachedRate', 'meanTicksToAllBad', 'sdTicksToAllBad', 'meanFinalBadFraction']];
-for (const [expName, points] of Object.entries(experiments)) {
-  for (const pt of points) {
-    const a1 = expName === 'exp1_badBotOnly' ? pt.alpha1 : 0.2;
-    const a2 = expName === 'exp2_correctionBots' ? pt.alpha2 : 0;
-    const a3 = expName === 'exp3_goodBots' ? pt.alpha3 : 0;
-    rows.push([expName, a1, a2, a3, pt.nRuns, pt.majorityReachedRate, pt.meanTicksToMajority, pt.sdTicksToMajority, pt.allBadReachedRate, pt.meanTicksToAllBad, pt.sdTicksToAllBad, pt.meanFinalBadFraction]);
-  }
-}
-fs.writeFileSync(path.join(outDir, 'results.csv'), rows.map(r => r.join(',')).join('\n'));
-
-console.log('Wrote results.json and results.csv');
-console.log(JSON.stringify(experiments, null, 2));
+module.exports = { runOnce };

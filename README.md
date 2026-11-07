@@ -1,133 +1,120 @@
 # Rumor Network Lab
 
-Code and data for *Using AI to Simulate Information Diffusion* by Lynnette Hui Xian Ng.
-The model connects individual beliefs, network exposure, and messages from rumor-spreading,
-correction, and proactive actors. The examples use a fictional singing contest.
+A small, parameter-driven Node.js package for simulating information diffusion.
+Edit a JSON file to set the population, network, actor composition, belief rules,
+and number of runs. Run the simulator to generate your own outcomes and belief histories.
 
-## Try the browser demonstrations
+## Quick start
 
-Open `rumor_network_lab.html` for the interactive lab, `index.html` for the probability-based
-network demonstration, or `index_llm.html` to replay the included LLM conversation. No build
-or API key is needed. The lab optionally loads fonts from Google Fonts.
-
-Alternatively, serve the directory with `python3 -m http.server 8000` and visit
-`http://localhost:8000/rumor_network_lab.html`.
-The replay page displays saved messages; it does not issue model requests from the browser.
-Browser illustrations and batch experiments use different population settings.
-
-## Reproduce the manuscript checks
-
-Use Node.js 20 or newer. The Node scripts have no third-party dependencies.
+Install Node.js 20 or newer, then clone the repository:
 
 ```sh
-npm test
-npm run audit
+git clone https://github.com/quarbby/rumor-network-lab.git
+cd rumor-network-lab
+npm run simulate
 ```
 
-The audit replays all 144 seeded probability-baseline runs and checks the stored summaries.
-It also compares 48 pairs with correction versus proactive roles and verifies completed-run
-counts and usage totals in the LLM checkpoints. It makes no model requests and writes
-`analysis/results_audit.json`. All 144 summaries reproduce exactly, and all 48 role pairs
-are identical because the baseline assigns both supportive roles the same rules.
-
-To regenerate the figures, install Python plotting dependencies and run:
+The default probability simulation needs no API key or dependency installation.
+It reads `config/simulation.json` and writes a new JSON file into `outputs/`.
+Edit the parameter file and repeat the command to run a different scenario.
+To use another file:
 
 ```sh
-python3 -m pip install -r requirements.txt
-python3 analysis/figures/generate_paper_figures.py
+npm run simulate -- path/to/parameters.json
 ```
 
-The generator reads the supplied data and audit, checks baseline source/data hashes,
-and writes vector PDF figures to `analysis/figures/`. To rerun the original probability
-sweeps, use `npm run experiment:baseline`; this overwrites `results.json`, `results.csv`,
-and `results.md`.
+## Parameters
 
-## LLM configuration and execution
+| Parameter | Meaning |
+| --- | --- |
+| `mode` | `probability`, `llm`, or `jev` |
+| `n` | Number of human agents |
+| `k` | Initial human-network degree; even and smaller than `n` |
+| `p` | Small-world rewiring probability, between zero and one |
+| `maxTicks` | Maximum interaction steps |
+| `flipThreshold` | Positive/negative exposure threshold for belief change |
+| `alpha1` | Rumor-spreading actors divided by human agents |
+| `alpha2` | Correction actors divided by rumor-spreading actors; probability mode only |
+| `alpha3` | Proactive actors divided by rumor-spreading actors |
+| `seed` | Initial random seed; successive replications use successive seeds |
+| `runs` | Number of independent replications |
+| `callBudget` | Maximum generation plus judgment requests per live run |
+| `jevThreshold` | Jev probability needed for a positive action, default 0.5 |
+| `jevModel` | Jev model identifier, default `typesafe/jev-1.14` |
+| `generationTemperature` | Message-generation temperature, default 0.9 |
+| `judgmentTemperature` | Generative-model judgment temperature, default 0.3 |
+| `generationTokenLimit` | Message-generation completion limit, default 1,800 |
+| `judgmentTokenLimit` | Generative-model judgment completion limit, default 4,000 |
+| `outputDir` | Directory for generated output, default `outputs/` |
 
-Copy `.env.example` to `.env` and select a provider. Process environment variables override
-file settings. Local LM Studio requires its OpenAI-compatible server and a loaded model.
-OpenRouter requires your own `OPENROUTER_API_KEY`. Never commit `.env`.
+Omitted parameters use the defaults in `src/index.cjs`. Unknown parameters and invalid
+settings produce an error before simulation. Actor counts are rounded to integers.
+For example, `n=10`, `alpha1=0.2`, and `alpha3=2` gives two rumor-spreading and four proactive actors.
+
+## Model mechanics
+
+Humans start by rejecting the rumor with an exposure score of zero. They connect through
+an undirected small-world network. Fixed-role actors each draw three to five human contacts
+with replacement and keep those contacts throughout a run. Repeated draws allow repeated
+exposures to the same human. In each step, actors decide whether to produce information,
+share it along their communication links, and attend to incoming information. Persuasive
+rumor exposures increase a human's score; supportive exposures decrease it. The positive
+threshold changes belief to rumor acceptance; the negative threshold changes it to rejection.
+Between thresholds, the previous belief persists. Scores have no decay or bound.
+
+Humans share their own information from the current step. They do not forward received
+messages directly. The contact graph stays fixed. The probability model represents information
+by rumor/supportive labels and uses seeded random decisions. Correction and proactive roles
+use the same supportive rules in that baseline. The live model implements rumor-spreading
+and proactive actors; it does not implement reactive correction, and rejects nonzero `alpha2`.
+
+## Live LLM and Jev runs
+
+Copy `.env.example` to `.env` and configure your provider:
 
 ```sh
 cp .env.example .env
-npm run demo:live
-# Other live experiments:
-npm run experiment:generation
-npm run experiment:two-tier
+npm run simulate -- examples/llm.json
+# Or use Jev for decisions, keeping the configured LLM for messages:
+npm run simulate -- examples/jev.json
 ```
 
-These commands invoke the configured model. OpenRouter calls incur provider charges.
-Live scripts overwrite their transcript or checkpoint files; use a separate checkout to
-preserve the supplied data. The two-tier runner resumes an existing checkpoint, so move
-`llm/experiment3-full-real-results.json` aside before starting a different model or setup.
-A provider name does not select its model automatically: set the model identifier too.
+`llm` uses an OpenAI-compatible local LM Studio server or OpenRouter for both message generation
+and judgments. `jev` uses that same generation provider and OpenRouter's Decisions API for judgments;
+it requires `OPENROUTER_API_KEY` even when message generation is local. Set `LLM_PROVIDER`, the model
+identifier, and credentials in `.env` or process environment variables. Environment variables take precedence.
+No credential is written into the outputs. Calls to paid providers incur their normal charges.
 
-`npm run demo:replay` reconstructs the default demonstration from saved message text without
-model requests. It writes the transcript files. Live demonstration ratios can be set with
-`ALPHA1`, `ALPHA2`, and `ALPHA3`; replay uses its fixed original roster.
+The fictional singing-contest prompts are in `src/personas.cjs`; edit them to change the scenario.
+Requests run sequentially with a 45-second timeout and no automatic retries. Invalid responses stop
+the run rather than silently replacing model decisions. If the call allowance is exhausted, the simulator
+stops and retains the last completed step. Calls made during an incomplete step remain in the usage log,
+but that step's state changes are discarded. An allowance does not force remaining actions to false.
 
-## Included results and interpretation
+## Outputs and reproducibility
 
-| Configuration | Data file | Completed runs |
-| --- | --- | ---: |
-| Probability baseline | `results.json` | 144 |
-| GLM message generation with probability decisions | `llm/experiment3-llm-results.json` | 16 |
-| GLM generation and judgments | `llm/experiment3-full-real-results.GLM53FLASHX.json` | 3 |
-| Qwen generation and judgments | `llm/experiment3-full-real-results.json` | 8 |
+Each output includes the complete configuration, per-run seeds, final rumor acceptance,
+majority timing, and belief fractions over completed steps. Live outputs also contain
+message prompts, generated messages, decision contexts and answers, model identifiers,
+request durations, and provider usage. New files receive unique names; earlier outputs are preserved.
+`outputs/` is ignored by Git. Archive your generated output to retain the response stream for a live run.
+A seed reproduces the probability model; it does not make remote LLM responses deterministic.
 
-GLM-5.3-FlashX ran through OpenRouter; Qwen2.5-7B-Instruct-1M ran through local LM Studio.
-Generation used temperature 0.9 and a 1,800-token completion limit. Judgment used temperature
-0.3 and a 4,000-token limit. The completed Qwen runs issued no generation calls because
-speaking decisions remained false. All three completed GLM two-tier runs exhausted their
-60-call allowance; the controller subsequently returns false at remaining decision gates.
-These mechanisms matter when interpreting zero rumor acceptance.
+This package preserves the original probability model's action and exposure rules. The live runner
+adds configurable populations and a stop-at-budget policy; it does not reproduce the former behavior
+of forcing negative decisions after exhausting an inference allowance.
 
-The baseline represents messages as polarity labels. Its correction and proactive roles
-have identical rules. The live demonstration implements a separate rumor-triggered reply.
-GLM generation also changes speaking and exposure-update rules relative to the baseline;
-the configurations do not isolate wording effects.
+## Use from code
 
-## Measured Jev benchmark
+```js
+const { simulate } = require('./src/index.cjs');
+const result = await simulate({ n: 30, runs: 5, seed: 42, alpha1: 0.2, alpha3: 1 });
+console.log(result.runs.map(run => run.finalBadFraction));
+```
 
-An additional live benchmark uses GLM for message generation and Jev 1.14 through
-OpenRouter's Decisions API for judgments. It runs ten humans, two rumor-spreading actors,
-one proactive actor, three steps, and seed 42. A Jev `noul` probability of at least 0.5
-produces a positive action. The run generates one message and makes 45 decisions.
+Use this snippet inside an async function or a compatible REPL. A loop over configurations
+can implement a parameter sweep. Call `npm test` for configuration, determinism, budget,
+and command-line checks; tests make no model requests.
 
-We then replay the same 45 contexts through GLM sequentially. The measured request totals
-are 3.30 seconds for message generation, 19.17 seconds for Jev decisions, and 153.40 seconds
-for GLM decisions. Adding the shared generation time gives 22.47 seconds with Jev and
-156.70 seconds with GLM judgments: a 6.97-fold speedup. These are matched-workload inference
-totals, not two independent trajectory runtimes. Jev and GLM agree on 19 of 45 decisions;
-speed does not establish equivalent behavior. There were no malformed GLM replies.
-
-The benchmark supersedes the earlier figure based on assumed latency. Historical baseline,
-GLM, and Qwen checkpoints remain unchanged. The live timing evidence, including request
-contexts, responses, and timings, is in `analysis/results_jev_benchmark.json`.
-The frozen simulation source used for this benchmark is in `analysis/benchmark_inputs/`.
-
-To repeat it with your own OpenRouter credentials, set `OPENROUTER_API_KEY` or configure
-it in the repository `.env`, then run `node analysis/benchmark_jev.cjs`. This makes live,
-billed requests and overwrites the benchmark JSON. Generation uses temperature 0.9 and
-1,800 output tokens; GLM judgments use 0.3 and 4,000 tokens. Calls are sequential with a
-45-second deadline and no retries. The original probability baseline still uses weighted
-random rules; it does not call Jev.
-
-## Files
-
-- `experiment.cjs`: original seeded baseline runner, preserved for reproducibility.
-- `botsim.js`: browser probability simulation.
-- `llm/`: prompts, model transport, judgment adapter, live experiments, saved outputs, replay.
-- `analysis/`: manuscript audit and figure generator.
-- `tests/`: isolated configuration checks; no external inference.
-- `requirements.txt`: optional Python figure dependencies.
-
-The source retains historical identifiers such as `badBot` and `goodBot` so the original
-simulation and result hashes remain reproducible. The guide describes their roles as
-rumor-spreading and proactive actors.
-
-The implementation draws on agent-based diffusion modeling and the LAND architecture.
-Related work: Lynnette Hui Xian Ng and Kathleen M. Carley, *Modeling Social Dynamics with
-an LLM-Enabled Agent Based Network-Dynamic (LAND) Model* (2026),
-https://arxiv.org/abs/2608.00929; and *Bots, Bias, and Influence: The Hidden Architects of
-Social Media* (Cambridge Scholars Publishing, 2026), ISBN 9781036473112.
+Related methods: Ng and Carley, *Modeling Social Dynamics with an LLM-Enabled Agent Based
+Network-Dynamic (LAND) Model*, https://arxiv.org/abs/2608.00929.

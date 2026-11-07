@@ -13,3 +13,6 @@ __pycache__/
 *.mp4
 *.zip
 .venv/
+
+# Generated simulation outputs
+outputs/
