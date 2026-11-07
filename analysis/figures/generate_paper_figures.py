@@ -141,41 +141,38 @@ def pilot_results():
 
 
 def jev_speedup():
-    """Project fixed-trace service time; latency inputs are assumptions."""
-    record = read("llm/experiment3-full-real-results.GLM53FLASHX.json")
-    trace = record["results"][0]["runs"][0]
-    messages, judgments = trace["genCalls"], trace["judgeCalls"]
-    assert (messages, judgments) == (7, 53)
-    fig, axes = plt.subplots(1, 2, figsize=(10.2, 3.6), sharex=True)
-    cases = [(2., .07, "A. Lower latency inputs"),
-             (4., .5, "B. Upper latency inputs")]
-    for ax, (generation_latency, jev_latency, title) in zip(axes, cases):
-        author_time = messages * generation_latency
-        decision_time = np.array([judgments * generation_latency, judgments * jev_latency])
-        totals = author_time + decision_time
-        ax.barh([1, 0], [author_time, author_time], color=PURPLE,
-                height=.43, label="Message authorship")
-        ax.barh([1, 0], decision_time, left=author_time, color=BLUE,
-                height=.43, label="Judgments")
-        for y, value in zip([1, 0], totals):
-            ax.text(value + 4, y, f"{value:g} s", va="center", fontsize=11)
-        ratio = totals[0] / totals[1]
-        ax.text(.98, .94, f"{ratio:.1f}x faster", transform=ax.transAxes,
-                ha="right", va="top", fontsize=13, weight="bold", color=BLUE)
-        ax.set(title=title, xlabel="Projected sequential inference time (seconds)",
-               yticks=[1, 0], yticklabels=["Without Jev", "With Jev"],
-               xlim=(0, 280), ylim=(-.5, 1.65))
-        ax.set_xticks([0, 60, 120, 180, 240])
-        ax.grid(axis="x", alpha=.18)
-        ax.set_axisbelow(True)
-        ax.text(.5, -.35,
-                f"Generative call: {generation_latency:g} s; Jev judgment: {jev_latency:g} s",
-                transform=ax.transAxes, ha="center", fontsize=10, color="#53616C")
-    fig.subplots_adjust(left=.10, right=.98, top=.83, bottom=.32, wspace=.31)
-    fig.text(.10, .98, "Fixed workload: 7 authored messages and 53 judgments",
-             va="top", fontsize=11)
-    axes[1].legend(loc="upper right", bbox_to_anchor=(1., -.51),
-                   ncol=2, frameon=False, fontsize=9)
+    """Plot measured request times from the live fixed-workload benchmark."""
+    report = json.loads((OUT.parent / "results_jev_benchmark.json").read_text())
+    assert report["completed"]
+    stats = report["summary"]
+    generation = stats["generationSeconds"]
+    decisions = [stats["glmJudgmentSeconds"], stats["jevJudgmentSeconds"]]
+    totals = [generation + value for value in decisions]
+    fig, axes = plt.subplots(1, 2, figsize=(10.2, 3.8))
+    ax, latency = axes
+    ax.barh([1, 0], [generation, generation], height=.42, color=PURPLE, label="Message generation")
+    ax.barh([1, 0], decisions, left=generation, height=.42, color=BLUE, label="Decisions")
+    for y, total in zip([1, 0], totals):
+        ax.text(total + max(totals)*.025, y, f"{total:.2f} s", va="center", fontsize=10)
+    ax.set(title="A. Matched inference workload", yticks=[1, 0],
+           yticklabels=["GLM decisions", "Jev decisions"], xlim=(0, max(totals)*1.25),
+           ylim=(-.6, 1.65), xlabel="Measured sequential inference time (seconds)")
+    ax.text(.98, .95, f"{stats['speedup']:.1f}x faster", transform=ax.transAxes,
+            ha="right", va="top", fontsize=13, color=BLUE, weight="bold")
+    ax.grid(axis="x", alpha=.18); ax.set_axisbelow(True)
+    ax.legend(loc="upper left", bbox_to_anchor=(0, -.22), ncol=2, frameon=False, fontsize=9)
+    for x, key, label, color in [(0, "glm", "GLM", PURPLE), (1, "jev", "Jev", BLUE)]:
+        values = np.array([item["seconds"] for item in report[key]])
+        offsets = np.linspace(-.10, .10, len(values))
+        latency.scatter(x + offsets, values, s=18, color=color, alpha=.6)
+        latency.plot([x-.17, x+.17], [values.mean()]*2, color=INK, linewidth=2)
+    latency.set(title="B. Individual decision requests", xticks=[0, 1], xticklabels=["GLM", "Jev"],
+                ylabel="Measured request latency (seconds)", xlim=(-.5, 1.5), ylim=(0, None))
+    latency.grid(axis="y", alpha=.18); latency.set_axisbelow(True)
+    latency.text(.5, -.24, "Dots: individual requests; bars: means", ha="center", transform=latency.transAxes,
+                 fontsize=9, color="#53616C")
+    fig.text(.10, .98, f"Live benchmark: {stats['messages']} generated message and {stats['decisions']} decisions", va="top", fontsize=11)
+    fig.subplots_adjust(left=.10, right=.98, top=.83, bottom=.26, wspace=.35)
     save(fig, "paper_jev_speedup")
 
 

@@ -87,10 +87,31 @@ have identical rules. The live demonstration implements a separate rumor-trigger
 GLM generation also changes speaking and exposure-update rules relative to the baseline;
 the configurations do not isolate wording effects.
 
-**No live Jev inference is included.** Older source comments call the local probability
-interface a “jev-mock”; it is a weighted random decision rule. The Jev figure projects
-sequential inference time for seven generated messages and 53 judgments using assumed
-latencies. It reports projected speedups of 4.4–6.8, rather than measured Jev performance.
+## Measured Jev benchmark
+
+An additional live benchmark uses GLM for message generation and Jev 1.14 through
+OpenRouter's Decisions API for judgments. It runs ten humans, two rumor-spreading actors,
+one proactive actor, three steps, and seed 42. A Jev `noul` probability of at least 0.5
+produces a positive action. The run generates one message and makes 45 decisions.
+
+We then replay the same 45 contexts through GLM sequentially. The measured request totals
+are 3.30 seconds for message generation, 19.17 seconds for Jev decisions, and 153.40 seconds
+for GLM decisions. Adding the shared generation time gives 22.47 seconds with Jev and
+156.70 seconds with GLM judgments: a 6.97-fold speedup. These are matched-workload inference
+totals, not two independent trajectory runtimes. Jev and GLM agree on 19 of 45 decisions;
+speed does not establish equivalent behavior. There were no malformed GLM replies.
+
+The benchmark supersedes the earlier figure based on assumed latency. Historical baseline,
+GLM, and Qwen checkpoints remain unchanged. The live timing evidence, including request
+contexts, responses, and timings, is in `analysis/results_jev_benchmark.json`.
+The frozen simulation source used for this benchmark is in `analysis/benchmark_inputs/`.
+
+To repeat it with your own OpenRouter credentials, set `OPENROUTER_API_KEY` or configure
+it in the repository `.env`, then run `node analysis/benchmark_jev.cjs`. This makes live,
+billed requests and overwrites the benchmark JSON. Generation uses temperature 0.9 and
+1,800 output tokens; GLM judgments use 0.3 and 4,000 tokens. Calls are sequential with a
+45-second deadline and no retries. The original probability baseline still uses weighted
+random rules; it does not call Jev.
 
 ## Files
 
