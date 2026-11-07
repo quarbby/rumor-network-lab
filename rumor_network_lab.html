@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rumor Network Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* layout: two-pane stage (network canvas + control deck), stacking to one column under 860px; a time-race strip ties computation to the story */
+:root{
+  --bg:#f5f3ee;
+  --surface:#ffffff;
+  --surface-2:#edeae2;
+  --fg:#1b1f23;
+  --muted:#6b7280;
+  --accent:#5a56d6;
+  --rumor:#c96a2e;
+  --correction:#1f8f8f;
+  --proactive:#3f8c4c;
+  --accept:#b43b3b;
+  --reject:#8a8f98;
+  --line: rgba(27,31,35,0.10);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0b0e13;
+    --surface:#12161d;
+    --surface-2:#171c25;
+    --fg:#e8eaef;
+    --muted:#8d94a3;
+    --accent:#a6a3f5;
+    --rumor:#e2903f;
+    --correction:#41c0c0;
+    --proactive:#69c279;
+    --accept:#e06565;
+    --reject:#7a8191;
+    --line: rgba(255,255,255,0.09);
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;}
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:'IBM Plex Sans', system-ui, sans-serif;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+}
+.page{max-width:1120px; margin:0 auto; padding:28px 0 48px;}
+.mono{font-family:'IBM Plex Mono', monospace;}
+header.hero{margin-bottom:22px;}
+.eyebrow{font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent);}
+h1{font-family:'Fraunces', serif; font-weight:600; font-size:clamp(28px,4vw,42px); line-height:1.05; margin:6px 0 10px; text-wrap:balance;}
+.lede{color:var(--muted); max-width:640px; line-height:1.55; font-size:15px; margin:0;}
+
+.stage{display:grid; grid-template-columns: 1.6fr 1fr; gap:18px; margin-top:22px;}
+@media (max-width: 860px){ .stage{grid-template-columns:1fr;} }
+
+.canvas-card{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; min-width:0;}
+.canvas-wrap{position:relative; width:100%; aspect-ratio:1/1; border-radius:10px; overflow:hidden; background:var(--surface-2);}
+#net{width:100%; height:100%; display:block;}
+#spark{width:100%; height:100%; display:block;}
+.legend{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted);}
+.legend span{display:inline-flex; align-items:center; gap:6px;}
+.swatch{width:10px; height:10px; border-radius:2px; display:inline-block; flex:none;}
+.swatch.circle{border-radius:50%;}
+
+.panel{display:flex; flex-direction:column; gap:14px; min-width:0;}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px; min-width:0;}
+.card h2{font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin:0 0 10px;}
+
+.engine-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.engine-btn{border:1px solid var(--line); background:var(--surface-2); color:var(--fg); border-radius:9px; padding:9px 8px; font-size:12.5px; font-family:'IBM Plex Mono', monospace; cursor:pointer; text-align:left; line-height:1.3; transition:border-color .15s, background .15s;}
+.engine-btn b{display:block; font-size:13px; margin-bottom:2px;}
+.engine-btn .tag{color:var(--muted); font-size:11px;}
+.engine-btn[aria-pressed="true"]{border-color:var(--accent); background:color-mix(in srgb, var(--accent) 16%, var(--surface-2));}
+.engine-btn:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+
+.slider-row{margin-bottom:12px;}
+.slider-row:last-child{margin-bottom:0;}
+.slider-row label{display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px;}
+.slider-row label .val{font-family:'IBM Plex Mono', monospace; color:var(--muted);}
+input[type=range]{width:100%; accent-color:var(--accent);}
+.slider-row .note{font-size:11px; color:var(--muted); margin-top:3px;}
+
+.btn-row{display:flex; gap:8px; margin-top:4px;}
+.btn{flex:1; border:1px solid var(--line); background:var(--surface-2); color:var(--fg); border-radius:9px; padding:9px; font-size:13px; cursor:pointer; font-family:'IBM Plex Sans', sans-serif;}
+.btn:hover{border-color:var(--accent);}
+.btn.primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+
+.stats{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.stat{background:var(--surface-2); border-radius:9px; padding:9px 10px;}
+.stat .k{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; font-family:'IBM Plex Mono', monospace;}
+.stat .v{font-family:'IBM Plex Mono', monospace; font-size:17px; font-variant-numeric:tabular-nums; margin-top:2px;}
+.stat .breakdown{font-family:'IBM Plex Mono', monospace; font-size:10.5px; color:var(--muted); margin-top:5px; line-height:1.5;}
+.stat .breakdown b{color:var(--fg); font-weight:500;}
+.stat.wide{grid-column:1/-1;}
+#chartWrap{height:150px; width:100%; min-width:0;}
+.chart-legend{display:flex; gap:14px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:6px;}
+.chart-legend span{display:inline-flex; align-items:center; gap:5px;}
+.chart-legend i{width:9px; height:9px; border-radius:2px; display:inline-block;}
+
+.race{margin-top:18px; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px;}
+.race h2{font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin:0 0 4px;}
+.race p.hint{font-size:12.5px; color:var(--muted); margin:0 0 14px; max-width:620px; line-height:1.5;}
+.bar-row{margin-bottom:12px;}
+.bar-row:last-child{margin-bottom:0;}
+.bar-label{display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px;}
+.bar-label .time{font-family:'IBM Plex Mono', monospace; font-variant-numeric:tabular-nums; color:var(--fg);}
+.bar-track{height:14px; border-radius:7px; background:var(--surface-2); overflow:hidden;}
+.bar-fill{height:100%; border-radius:7px; transition:width .35s ease;}
+.bar-fill.gen{background:var(--reject);}
+.bar-fill.cur{background:var(--accent);}
+
+footer{margin-top:26px; font-size:12px; color:var(--muted); line-height:1.6;}
+footer a{color:inherit;}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <div class="eyebrow">LAND model &middot;</div>
+    <h1>Rumor Network Lab</h1>
+    <p class="lede">A small-world community where a rumor spreads, correction and goodwill accounts push back, and every exposure triggers a judgment call. </p>
+  </header>
+
+  <div class="stage">
+    <div class="canvas-card">
+      <div class="canvas-wrap"><canvas id="net" aria-label="Animated network simulation"></canvas></div>
+      <div class="legend">
+        <span><i class="swatch circle" style="background:var(--reject)"></i>human &middot; rejecting</span>
+        <span><i class="swatch circle" style="background:var(--accept)"></i>human &middot; accepted rumor</span>
+        <span><i class="swatch" style="background:var(--rumor); clip-path:polygon(50% 0,0 100%,100% 100%)"></i>rumor account</span>
+        <span><i class="swatch" style="background:var(--correction); clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></i>correction account</span>
+        <span><i class="swatch" style="background:var(--proactive)"></i>proactive account</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h2>Judgment engine</h2>
+        <div class="engine-grid" id="engineGrid"></div>
+        <!-- <div class="note" style="margin-top:8px;">Pulses crawl and queue up on GLM/Qwen; they dart through on Jev or probability rules. The whole network's pace follows your pick.</div> -->
+      </div>
+
+      <div class="card">
+        <h2>Account mix (&alpha; ratios)</h2>
+        <div class="slider-row">
+          <label>Rumor &middot; &alpha;&#8321; = rumor / humans <span class="val" id="a1val"></span></label>
+          <input type="range" id="a1" min="0.1" max="1.0" step="0.02" value="0.2">
+          <div class="note" id="a1note"></div>
+        </div>
+        <div class="slider-row">
+          <label>Correction &middot; &alpha;&#8322; = correction / rumor <span class="val" id="a2val"></span></label>
+          <input type="range" id="a2" min="0" max="1.5" step="0.05" value="0">
+          <div class="note" id="a2note"></div>
+        </div>
+        <div class="slider-row">
+          <label>Proactive &middot; &alpha;&#8323; = proactive / rumor <span class="val" id="a3val"></span></label>
+          <input type="range" id="a3" min="0" max="2.0" step="0.05" value="0.8">
+          <div class="note" id="a3note"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" id="playBtn">Pause</button>
+          <button class="btn" id="resetBtn">Reset network</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Run readout</h2>
+        <div class="stats">
+          <div class="stat"><div class="k">Step</div><div class="v" id="stStep">0</div></div>
+          <div class="stat"><div class="k">Accepted rumor</div><div class="v" id="stFrac">0%</div></div>
+          <div class="stat">
+            <div class="k">Authored (M)</div><div class="v" id="stM">0</div>
+            <div class="breakdown" id="stMBreak">rumor <b>0</b> &middot; correction <b>0</b> &middot; proactive <b>0</b></div>
+          </div>
+          <div class="stat">
+            <div class="k">Judgments (D)</div><div class="v" id="stD">0</div>
+            <div class="breakdown" id="stDBreak">attended <b>0</b> &middot; skipped <b>0</b> &middot; re-shared <b>0</b></div>
+          </div>
+          <div class="stat"><div class="k">Pending judgments</div><div class="v" id="stPending">0</div></div>
+          <div class="stat"><div class="k">Belief split</div><div class="v" id="stSplit">0 / 22</div></div>
+          <div class="stat wide">
+            <div class="k">Belief trend over time</div>
+            <div id="chartWrap"><canvas id="spark"></canvas></div>
+            <div class="chart-legend">
+              <span><i style="background:var(--accept)"></i>accepted rumor</span>
+              <span><i style="background:var(--reject)"></i>rejecting</span>
+            </div>
+          </div>
+          <div class="stat"><div class="k">Projected time</div><div class="v" id="stTime">0.0s</div></div>
+          <div class="stat"><div class="k">Cost (this run)</div><div class="v" id="stCost">$0.00</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="race">
+    <h2>Service-time race</h2>
+    <p class="hint">Same workload, two ways of serving it &mdash; every authored message and every judgment call, priced at the selected engine's latency versus an all-generative baseline. This mirrors the paper's projection: a fixed GLM workload of 7 authorship and 53 judgment calls falls from roughly 120&ndash;240s to 18&ndash;55s once judgments move to Jev.</p>
+    <div class="bar-row">
+      <div class="bar-label"><span>All-generative (every call through the LLM)</span><span class="time mono" id="genTime">0.0s</span></div>
+      <div class="bar-track"><div class="bar-fill gen" id="genBar" style="width:0%"></div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label"><span id="curLabel">Current engine</span><span class="time mono" id="curTime">0.0s</span></div>
+      <div class="bar-track"><div class="bar-fill cur" id="curBar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <footer>
+    Visualization built for the paper ``Using AI to Simulate Information Diffusion".
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var ENGINES = [
+    {id:'prob', name:'Probability rules', tag:'local, instant', genLat:[2,4], judgeLat:[0.01,0.05], costPerCall:0, flash:110, speed:0.45},
+    {id:'glm', name:'GLM-5.3-FlashX', tag:'OpenRouter, two-tier', genLat:[2,4], judgeLat:[2,4], costPerCall:0.000743, flash:3200, speed:2.6},
+    {id:'qwen', name:'Qwen2.5-7B', tag:'local LM Studio, free', genLat:[2,4], judgeLat:[2,4], costPerCall:0, flash:3200, speed:2.6},
+    {id:'jev', name:'Jev (projected)', tag:'dedicated judgment model', genLat:[2,4], judgeLat:[0.07,0.5], costPerCall:null, flash:450, speed:0.8}
+  ];
+  var engine = ENGINES[3];
+  var BASE_TICK = 1300, BASE_PULSE = 1000;
+
+  var H = 22;
+  var cv = document.getElementById('net');
+  var ctx = cv.getContext('2d');
+  var spark = document.getElementById('spark');
+  var sctx = spark.getContext('2d');
+  var dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function resize(){
+    var box = cv.parentElement.getBoundingClientRect();
+    cv.width = Math.round(box.width * dpr);
+    cv.height = Math.round(box.height * dpr);
+    var sbox = spark.parentElement.getBoundingClientRect();
+    spark.width = Math.round(sbox.width * dpr);
+    spark.height = Math.round(sbox.height * dpr);
+    layoutNodes();
+  }
+
+  var humans = [], bots = [], edgesHH = [], pulses = [], glows = [];
+  var M = 0, D = 0, elapsedCur = 0, elapsedGen = 0, cost = 0, step = 0;
+  var MByType = {rumor:0, correction:0, proactive:0};
+  var attended = 0, skipped = 0, reshared = 0;
+  var history = [];
+  var playing = true;
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+  function randInt(a,b){ return Math.floor(rand(a,b+1)); }
+  function sample(arr,n){
+    var pool = arr.slice(), out = [];
+    n = Math.min(n, pool.length);
+    for(var i=0;i<n;i++){ out.push(pool.splice(randInt(0,pool.length-1),1)[0]); }
+    return out;
+  }
+
+  function buildNetwork(){
+    var a1 = parseFloat(document.getElementById('a1').value);
+    var a2 = parseFloat(document.getElementById('a2').value);
+    var a3 = parseFloat(document.getElementById('a3').value);
+
+    humans = [];
+    for(var i=0;i<H;i++){
+      humans.push({idx:i, belief:'reject', exposure:0, x:0, y:0});
+    }
+    edgesHH = [];
+    var k = 4;
+    for(var i2=0;i2<H;i2++){
+      for(var d=1; d<=k/2; d++){
+        var j = (i2+d)%H;
+        edgesHH.push([i2,j]);
+      }
+    }
+    edgesHH = edgesHH.map(function(e){
+      if(Math.random() < 0.12){
+        var nb = randInt(0,H-1);
+        var tries = 0;
+        while((nb===e[0]) && tries<5){ nb = randInt(0,H-1); tries++; }
+        return [e[0], nb];
+      }
+      return e;
+    });
+    var adj = {};
+    humans.forEach(function(h){ adj[h.idx] = []; });
+    edgesHH.forEach(function(e){
+      if(e[0]!==e[1]){ adj[e[0]].push(e[1]); adj[e[1]].push(e[0]); }
+    });
+    humans.forEach(function(h){ h.neighbors = adj[h.idx]; });
+
+    var rumorCount = Math.min(20, Math.max(1, Math.round(a1*H)));
+    var correctionCount = Math.min(20, Math.round(a2*rumorCount));
+    var proactiveCount = Math.min(22, Math.round(a3*rumorCount));
+
+    bots = [];
+    function addBots(type, count){
+      for(var i=0;i<count;i++){
+        var targets = sample(humans.map(function(h){return h.idx;}), randInt(3,5));
+        bots.push({type:type, targets:targets, x:0, y:0});
+      }
+    }
+    addBots('rumor', rumorCount);
+    addBots('correction', correctionCount);
+    addBots('proactive', proactiveCount);
+
+    document.getElementById('a1note').textContent = rumorCount + ' rumor accounts';
+    document.getElementById('a2note').textContent = correctionCount + ' correction accounts';
+    document.getElementById('a3note').textContent = proactiveCount + ' proactive accounts';
+
+    pulses = []; glows = [];
+    M = 0; D = 0; elapsedCur = 0; elapsedGen = 0; cost = 0; step = 0;
+    MByType = {rumor:0, correction:0, proactive:0};
+    attended = 0; skipped = 0; reshared = 0;
+    history = [];
+    layoutNodes();
+    updateStats();
+  }
+
+  function layoutNodes(){
+    var w = cv.width/dpr, h = cv.height/dpr;
+    var cx = w/2, cy = h/2;
+    var R1 = Math.min(w,h)*0.30;
+    humans.forEach(function(hm, i){
+      var ang = (i/H)*Math.PI*2 - Math.PI/2;
+      hm.x = cx + R1*Math.cos(ang);
+      hm.y = cy + R1*Math.sin(ang);
+    });
+    var groups = {rumor:[], correction:[], proactive:[]};
+    bots.forEach(function(b){ groups[b.type].push(b); });
+    var arcs = {rumor:[-150,-30], correction:[-30,90], proactive:[90,210]};
+    Object.keys(groups).forEach(function(type){
+      var arr = groups[type];
+      var a0 = arcs[type][0]*Math.PI/180, a1 = arcs[type][1]*Math.PI/180;
+      var R2 = R1*1.62;
+      arr.forEach(function(b,i){
+        var t = arr.length>1 ? i/(arr.length-1) : 0.5;
+        var ang = a0 + (a1-a0)*t;
+        b.x = cx + R2*Math.cos(ang);
+        b.y = cy + R2*Math.sin(ang);
+      });
+    });
+  }
+
+  var speakProb = {rumor:0.55, correction:0.4, proactive:0.5};
+  var polarity = {rumor:1, correction:-1, proactive:-1};
+  var colorVar = {rumor:'--rumor', correction:'--correction', proactive:'--proactive'};
+
+  function engLat(range){ return rand(range[0], range[1]); }
+
+  function tick(){
+    step++;
+    bots.forEach(function(b){
+      if(Math.random() < speakProb[b.type]){
+        M++;
+        MByType[b.type]++;
+        elapsedCur += engLat(engine.genLat);
+        elapsedGen += engLat([2,4]);
+        if(engine.costPerCall!==null) cost += engine.costPerCall;
+        b.targets.forEach(function(ti){
+          spawnPulse(b.x, b.y, humans[ti].x, humans[ti].y, css(colorVar[b.type]), {kind:'exposure', target:ti, pol:polarity[b.type]});
+        });
+      }
+    });
+    var acceptN = humans.filter(function(h){return h.belief==='accept';}).length;
+    var rejectN = humans.filter(function(h){return h.belief==='reject';}).length;
+    history.push({step:step, accept:acceptN/H, reject:rejectN/H});
+    if(history.length>80) history.shift();
+    updateStats();
+  }
+
+  function spawnPulse(x1,y1,x2,y2,color,payload){
+    var dur = reduceMotion ? 1 : BASE_PULSE * engine.speed;
+    pulses.push({x1:x1,y1:y1,x2:x2,y2:y2,color:color,t0:performance.now(),dur:dur,payload:payload});
+  }
+
+  function onArrive(payload){
+    D++;
+    elapsedCur += engLat(engine.judgeLat);
+    elapsedGen += engLat([2,4]);
+    if(engine.costPerCall!==null) cost += engine.costPerCall;
+    glows.push({idx:payload.target, t0:performance.now(), dur: reduceMotion? Math.min(engine.flash,300): engine.flash});
+
+    var attend = Math.random() < 0.7;
+    if(attend){
+      attended++;
+      var h = humans[payload.target];
+      h.exposure += payload.pol;
+      if(h.exposure >= 4) h.belief = 'accept';
+      else if(h.exposure <= -4) h.belief = 'reject';
+
+      if(Math.random() < 0.4){
+        reshared++;
+        D++;
+        elapsedCur += engLat(engine.judgeLat);
+        elapsedGen += engLat([2,4]);
+        if(engine.costPerCall!==null) cost += engine.costPerCall;
+        glows.push({idx:payload.target, t0:performance.now()+120, dur: reduceMotion? Math.min(engine.flash,300): engine.flash});
+        sample(h.neighbors, Math.min(2,h.neighbors.length)).forEach(function(nb){
+          spawnPulse(h.x, h.y, humans[nb].x, humans[nb].y, css('--fg'), {kind:'exposure', target:nb, pol:payload.pol});
+        });
+      }
+    } else {
+      skipped++;
+    }
+  }
+
+  function draw(now){
+    var w = cv.width/dpr, h = cv.height/dpr;
+    ctx.save();
+    ctx.scale(dpr,dpr);
+    ctx.clearRect(0,0,w,h);
+
+    ctx.strokeStyle = css('--line');
+    ctx.lineWidth = 1;
+    edgesHH.forEach(function(e){
+      ctx.beginPath();
+      ctx.moveTo(humans[e[0]].x, humans[e[0]].y);
+      ctx.lineTo(humans[e[1]].x, humans[e[1]].y);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 0.35;
+    bots.forEach(function(b){
+      b.targets.forEach(function(ti){
+        ctx.beginPath();
+        ctx.moveTo(b.x,b.y);
+        ctx.lineTo(humans[ti].x, humans[ti].y);
+        ctx.strokeStyle = css(colorVar[b.type]);
+        ctx.stroke();
+      });
+    });
+    ctx.globalAlpha = 1;
+
+    glows = glows.filter(function(g){
+      var t = (now-g.t0)/g.dur;
+      if(t<0) return true;
+      if(t>1) return false;
+      var hm = humans[g.idx];
+      ctx.beginPath();
+      ctx.arc(hm.x, hm.y, 10, 0, Math.PI*2);
+      ctx.strokeStyle = css('--line');
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      var spin = ((now-g.t0)/260) % (Math.PI*2);
+      ctx.beginPath();
+      ctx.arc(hm.x, hm.y, 10, spin, spin + Math.PI*1.3);
+      ctx.strokeStyle = css('--accent');
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = t>0.85 ? (1-t)/0.15 : 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return true;
+    });
+
+    pulses = pulses.filter(function(p){
+      var t = (now-p.t0)/p.dur;
+      if(t>1){ onArrive(p.payload); return false; }
+      var hx = p.x1 + (p.x2-p.x1)*t;
+      var hy = p.y1 + (p.y2-p.y1)*t;
+      var tx = p.x1 + (p.x2-p.x1)*Math.max(0,t-0.1);
+      var ty = p.y1 + (p.y2-p.y1)*Math.max(0,t-0.1);
+      ctx.beginPath();
+      ctx.moveTo(tx,ty); ctx.lineTo(hx,hy);
+      ctx.strokeStyle = p.color; ctx.lineWidth = 2.4; ctx.globalAlpha = 0.85;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(hx,hy,3,0,Math.PI*2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      return true;
+    });
+
+    humans.forEach(function(hm){
+      ctx.beginPath();
+      ctx.arc(hm.x, hm.y, 7, 0, Math.PI*2);
+      ctx.fillStyle = hm.belief==='accept' ? css('--accept') : css('--reject');
+      ctx.fill();
+    });
+    bots.forEach(function(b){
+      ctx.fillStyle = css(colorVar[b.type]);
+      ctx.beginPath();
+      if(b.type==='rumor'){
+        ctx.moveTo(b.x, b.y-7); ctx.lineTo(b.x-6, b.y+5); ctx.lineTo(b.x+6, b.y+5); ctx.closePath();
+      } else if(b.type==='correction'){
+        ctx.moveTo(b.x, b.y-7); ctx.lineTo(b.x+7, b.y); ctx.lineTo(b.x, b.y+7); ctx.lineTo(b.x-7, b.y); ctx.closePath();
+      } else {
+        ctx.rect(b.x-6, b.y-6, 12, 12);
+      }
+      ctx.fill();
+    });
+
+    ctx.restore();
+    drawSpark();
+    document.getElementById('stPending').textContent = glows.length;
+  }
+
+  function drawSpark(){
+    var padL = 30, padB = 16, padT = 6, padR = 4;
+    var w = spark.width/dpr, h = spark.height/dpr;
+    sctx.save();
+    sctx.scale(dpr,dpr);
+    sctx.clearRect(0,0,w,h);
+    var plotW = w - padL - padR, plotH = h - padT - padB;
+
+    sctx.strokeStyle = css('--line');
+    sctx.lineWidth = 1;
+    sctx.font = '10px IBM Plex Mono, monospace';
+    sctx.fillStyle = css('--muted');
+    [0, 0.5, 1].forEach(function(frac){
+      var y = padT + plotH*(1-frac);
+      sctx.beginPath();
+      sctx.moveTo(padL, y); sctx.lineTo(w-padR, y);
+      sctx.stroke();
+      sctx.textAlign = 'right';
+      sctx.textBaseline = 'middle';
+      sctx.fillText(Math.round(frac*100)+'%', padL-6, y);
+    });
+
+    if(history.length<2){ sctx.restore(); return; }
+
+    sctx.textAlign = 'center';
+    sctx.textBaseline = 'top';
+    sctx.fillText('step '+history[0].step, padL + 2, h-padB+3);
+    sctx.fillText('step '+history[history.length-1].step, w-padR-2, h-padB+3);
+
+    function drawLine(key, colorVar){
+      sctx.beginPath();
+      history.forEach(function(v,i){
+        var x = padL + (i/(history.length-1))*plotW;
+        var y = padT + (1-v[key])*plotH;
+        if(i===0) sctx.moveTo(x,y); else sctx.lineTo(x,y);
+      });
+      sctx.strokeStyle = css(colorVar);
+      sctx.lineWidth = 2;
+      sctx.lineJoin = 'round';
+      sctx.stroke();
+      var last = history[history.length-1];
+      var lx = padL + plotW, ly = padT + (1-last[key])*plotH;
+      sctx.beginPath();
+      sctx.arc(lx, ly, 2.6, 0, Math.PI*2);
+      sctx.fillStyle = css(colorVar);
+      sctx.fill();
+    }
+    drawLine('reject', '--reject');
+    drawLine('accept', '--accept');
+
+    sctx.restore();
+  }
+
+  function updateStats(){
+    document.getElementById('stStep').textContent = step;
+    var frac = history.length ? history[history.length-1].accept : 0;
+    document.getElementById('stFrac').textContent = Math.round(frac*100)+'%';
+    document.getElementById('stM').textContent = M;
+    document.getElementById('stMBreak').innerHTML = 'rumor <b>'+MByType.rumor+'</b> &middot; correction <b>'+MByType.correction+'</b> &middot; proactive <b>'+MByType.proactive+'</b>';
+    document.getElementById('stD').textContent = D;
+    document.getElementById('stDBreak').innerHTML = 'attended <b>'+attended+'</b> &middot; skipped <b>'+skipped+'</b> &middot; re-shared <b>'+reshared+'</b>';
+    document.getElementById('stPending').textContent = glows.length;
+    var acceptN = humans.filter(function(h){return h.belief==='accept';}).length;
+    var rejectN = humans.filter(function(h){return h.belief==='reject';}).length;
+    document.getElementById('stSplit').textContent = acceptN+' / '+rejectN;
+    document.getElementById('stTime').textContent = elapsedCur.toFixed(1)+'s';
+    document.getElementById('stCost').textContent = engine.costPerCall===null ? 'vendor-priced' : ('$'+cost.toFixed(4));
+
+    document.getElementById('genTime').textContent = elapsedGen.toFixed(1)+'s';
+    document.getElementById('curTime').textContent = elapsedCur.toFixed(1)+'s';
+    document.getElementById('curLabel').textContent = engine.name + ' (current engine)';
+    var scale = Math.max(elapsedGen, 1);
+    document.getElementById('genBar').style.width = (100*elapsedGen/scale)+'%';
+    document.getElementById('curBar').style.width = Math.min(100, 100*elapsedCur/scale)+'%';
+
+    document.getElementById('a1val').textContent = parseFloat(document.getElementById('a1').value).toFixed(2);
+    document.getElementById('a2val').textContent = parseFloat(document.getElementById('a2').value).toFixed(2);
+    document.getElementById('a3val').textContent = parseFloat(document.getElementById('a3').value).toFixed(2);
+  }
+
+  var engGrid = document.getElementById('engineGrid');
+  ENGINES.forEach(function(e){
+    var btn = document.createElement('button');
+    btn.className = 'engine-btn';
+    btn.type = 'button';
+    btn.setAttribute('aria-pressed', e.id===engine.id ? 'true':'false');
+    btn.innerHTML = '<b>'+e.name+'</b><span class="tag">'+e.tag+'</span>';
+    btn.addEventListener('click', function(){
+      engine = e;
+      TICK_MS = BASE_TICK * engine.speed;
+      Array.prototype.forEach.call(engGrid.children, function(c){ c.setAttribute('aria-pressed','false'); });
+      btn.setAttribute('aria-pressed','true');
+      updateStats();
+    });
+    engGrid.appendChild(btn);
+  });
+
+  ['a1','a2','a3'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', function(){ buildNetwork(); });
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', buildNetwork);
+  var playBtn = document.getElementById('playBtn');
+  playBtn.addEventListener('click', function(){
+    playing = !playing;
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+  });
+
+  var TICK_MS = BASE_TICK * engine.speed;
+  var acc = 0, last = performance.now();
+  function loop(now){
+    var dt = now-last; last = now;
+    if(playing){
+      acc += dt;
+      while(acc >= TICK_MS){ tick(); acc -= TICK_MS; }
+    }
+    draw(now);
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', resize);
+  buildNetwork();
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

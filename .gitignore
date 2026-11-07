@@ -1,0 +1,15 @@
+# Private configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Dependencies, caches, and local artifacts
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+*.mp4
+*.zip
+.venv/

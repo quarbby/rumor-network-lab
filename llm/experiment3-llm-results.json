@@ -1,0 +1,171 @@
+{
+  "model": "z-ai/glm-5.3-flashx",
+  "base": {
+    "n": 10,
+    "k": 4,
+    "p": 0.15,
+    "maxTicks": 4,
+    "flipThreshold": 3,
+    "alpha1": 0.2,
+    "alpha2": 0,
+    "callBudgetPerRun": 14
+  },
+  "nReps": 3,
+  "usage": {
+    "totalCalls": 245,
+    "totalCost": 0.1818264899999999,
+    "totalTokens": 174949
+  },
+  "results": [
+    {
+      "alpha3": 0,
+      "nRuns": 2,
+      "majorityReachedRate": 0,
+      "meanTicksToMajority": null,
+      "meanFinalBadFraction": 0.25,
+      "runs": [
+        {
+          "finalBadFraction": 0.1,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 12
+        },
+        {
+          "finalBadFraction": 0.4,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 13
+        }
+      ]
+    },
+    {
+      "alpha3": 0.4,
+      "nRuns": 3,
+      "majorityReachedRate": 0,
+      "meanTicksToMajority": null,
+      "meanFinalBadFraction": 0.20000000000000004,
+      "runs": [
+        {
+          "finalBadFraction": 0.1,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        },
+        {
+          "finalBadFraction": 0.3,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        },
+        {
+          "finalBadFraction": 0.2,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        }
+      ]
+    },
+    {
+      "alpha3": 0.8,
+      "nRuns": 3,
+      "majorityReachedRate": 0,
+      "meanTicksToMajority": null,
+      "meanFinalBadFraction": 0.20000000000000004,
+      "runs": [
+        {
+          "finalBadFraction": 0.2,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        },
+        {
+          "finalBadFraction": 0,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        },
+        {
+          "finalBadFraction": 0.4,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        }
+      ]
+    },
+    {
+      "alpha3": 1.2,
+      "nRuns": 2,
+      "majorityReachedRate": 0,
+      "meanTicksToMajority": null,
+      "meanFinalBadFraction": 0.15000000000000002,
+      "runs": [
+        {
+          "finalBadFraction": 0.2,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 13
+        },
+        {
+          "finalBadFraction": 0.1,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        }
+      ]
+    },
+    {
+      "alpha3": 1.6,
+      "nRuns": 3,
+      "majorityReachedRate": 0,
+      "meanTicksToMajority": null,
+      "meanFinalBadFraction": 0.06666666666666667,
+      "runs": [
+        {
+          "finalBadFraction": 0.2,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        },
+        {
+          "finalBadFraction": 0,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        },
+        {
+          "finalBadFraction": 0,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        }
+      ]
+    },
+    {
+      "alpha3": 2,
+      "nRuns": 3,
+      "majorityReachedRate": 0,
+      "meanTicksToMajority": null,
+      "meanFinalBadFraction": 0.09999999999999999,
+      "runs": [
+        {
+          "finalBadFraction": 0,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        },
+        {
+          "finalBadFraction": 0,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        },
+        {
+          "finalBadFraction": 0.3,
+          "majorityReached": false,
+          "ticksToMajority": null,
+          "callsUsed": 14
+        }
+      ]
+    }
+  ]
+}
