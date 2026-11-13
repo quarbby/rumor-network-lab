@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rumor Network Lab — Four simulation approaches</title>
+<link rel="stylesheet" href="web/style.css">
+<script defer src="src/model.js"></script><script defer src="web/app.js"></script>
+</head>
+<body>
+<main>
+<header><div class="eyebrow">A guide to network simulation</div><h1>Rumor Network Lab</h1><p class="intro">One network. Four ways to decide actions and produce messages. Count how many humans accept the rumor after 20 steps.</p></header>
+<section class="approaches" aria-label="Simulation approaches">
+<button class="approach selected" data-mode="probability" aria-pressed="true"><span>01 · Probability</span><strong>Rules + labels</strong><small>Probabilistic actions, no model requests</small></button>
+<button class="approach" data-mode="probability-llm" aria-pressed="false"><span>02 · Probability + LLM</span><strong>Rules + messages</strong><small>Probabilistic actions, LLM messages</small></button>
+<button class="approach" data-mode="llm" aria-pressed="false"><span>03 · LLM + LLM</span><strong>Model actions + messages</strong><small>An LLM decides whether to send</small></button>
+<button class="approach" data-mode="jev" aria-pressed="false"><span>04 · Jev + LLM</span><strong>Jev actions + messages</strong><small>Jev decides, an LLM writes</small></button>
+</section>
+<div class="workspace">
+<aside class="panel controls"><h2>Initial conditions</h2><form id="settings">
+<div class="fields"><label>Humans<input name="n" type="number" min="3" max="500" value="30" required></label><label>Steps<input name="maxTicks" type="number" min="1" max="500" value="20" required></label>
+<label>Rumor bots<input name="rumorBots" type="number" min="0" max="500" value="6" required></label><label>Counter-rumor bots<input name="counterRumorBots" type="number" min="0" max="500" value="6" required></label>
+<label>Neighbors (even)<input name="k" type="number" min="2" step="2" value="4" required></label><label>Rewiring probability<input name="p" type="number" min="0" max="1" step="0.01" value="0.15" required></label>
+<label>Belief threshold<input name="flipThreshold" type="number" min="1" value="3" required></label><label>Seed<input name="seed" type="number" min="0" max="4294967295" value="42" required></label>
+<label>Replications<input name="runs" type="number" min="1" max="100" value="1" required></label><label>Request allowance<input name="callBudget" type="number" min="1" value="2000" required></label></div>
+<label class="full">Claim for generated messages<input name="claim" maxlength="2000" value="The community event result was manipulated." required></label>
+<button class="primary" type="submit" id="run-button">Run Approach 1 locally</button></form>
+<p id="mode-note" class="note">Runs in your browser using probability rules. No API key or model requests.</p>
+<details><summary>Run from the package</summary><pre id="command">npm run approach:1</pre><button id="download-config" type="button">Download configuration</button><p class="note">Save as <code>config/simulation.json</code>. For model runs, set credentials in the package’s ignored <code>.env</code> file.</p></details>
+<div class="load"><label for="import-results" class="button">Load saved results</label><input id="import-results" type="file" accept=".json,application/json"><button id="export-results" disabled>Export results</button></div>
+<p id="notice" role="status" aria-live="polite"></p>
+</aside>
+<section class="results" aria-label="Simulation results">
+<div class="stats"><div><span id="count-label">Accepting at step 20</span><strong id="count">—</strong><small id="fraction">Run a simulation to begin</small></div><div><span>Messages sent</span><strong id="messages">—</strong><small id="deliveries">Deliveries: —</small></div><div><span>Model requests</span><strong id="requests">—</strong><small id="request-detail">No results loaded</small></div><div><span>Request time / API charge</span><strong id="time">—</strong><small id="cost">—</small></div></div>
+<div class="panel visualization"><div class="section-head"><h2>Human beliefs and bot contacts</h2><span id="run-badge" class="badge">Approach 1 · ready</span></div>
+<div class="replication"><label>Displayed run <select id="replication" disabled><option>Run a simulation first</option></select></label><span id="completion"></span></div>
+<div class="networks"><figure><figcaption>Initial state · step 0</figcaption><canvas id="initial-network" width="560" height="420" role="img" aria-label="Initial network"></canvas></figure><figure><figcaption id="final-caption">Final state · step 20</figcaption><canvas id="final-network" width="560" height="420" role="img" aria-label="Final network"></canvas></figure></div>
+<div class="legend"><span><i class="dot reject"></i>Rejecting human</span><span><i class="dot accept"></i>Accepting human</span><span><i class="square"></i>Rumor bot</span><span><i class="triangle"></i>Counter-rumor bot</span></div><p class="note" id="network-note">Contacts stay fixed. Human colors show beliefs; squares and triangles are bots.</p></div>
+<div class="panel"><div class="section-head"><h2>Rumor acceptance over time</h2><span id="summary" class="note"></span></div><canvas id="history" width="1100" height="230" role="img" aria-label="Number of accepting humans by completed step"></canvas></div>
+<details class="panel"><summary>Messages and action decisions</summary><p class="note">Category labels determine belief effects. Generated wording is shown when available. Incomplete-step requests are excluded from completed belief updates.</p><div id="message-log" class="message-log">No messages yet.</div></details>
+</section></div>
+<section class="explanation panel"><h2>The same belief rule in all four approaches</h2><p>Every human starts by rejecting the rumor with a score of zero. Each delivered rumor message adds one; each counter-rumor message subtracts one. At the end of a step, a score of at least +3 means acceptance, and a score of at most −3 means rejection. Between those thresholds, the previous belief persists. The threshold control changes both limits.</p><p>A bot sends to its assigned humans; a human sends to every network neighbor. All belief changes happen together at the end of a step. We complete all 20 steps, even if everyone accepts earlier. A run that stops before step 20 has no observed count for step 20.</p><p>Model runs execute in Node.js, where credentials remain local. This page runs Approach 1 or displays saved outputs from the four approaches. It never simulates model responses.</p></section>
+<footer>Rumor Network Lab · <a href="https://github.com/quarbby/rumor-network-lab">Code and method</a> · A teaching model, not a forecast of human behavior.</footer>
+</main>
+</body></html>

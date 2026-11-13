@@ -1,0 +1,15 @@
+{
+  "mode": "probability",
+  "n": 30,
+  "k": 4,
+  "p": 0.15,
+  "maxTicks": 20,
+  "flipThreshold": 3,
+  "rumorBots": 6,
+  "counterRumorBots": 6,
+  "seed": 42,
+  "runs": 1,
+  "callBudget": 2000,
+  "jevThreshold": 0.5,
+  "outputDir": "outputs"
+}

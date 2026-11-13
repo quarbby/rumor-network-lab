@@ -1,15 +1,20 @@
 {
   "name": "rumor-network-lab",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "Parameter-driven information-diffusion simulator",
+  "description": "Four approaches to rumor diffusion on a shared small-world network",
   "main": "src/index.cjs",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "simulate": "node bin/simulate.cjs",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "approach:1": "node bin/simulate.cjs --approach 1",
+    "approach:2": "node bin/simulate.cjs --approach 2",
+    "approach:3": "node bin/simulate.cjs --approach 3",
+    "approach:4": "node bin/simulate.cjs --approach 4",
+    "preview": "node bin/preview.cjs"
   },
   "files": [
     "src/",
@@ -17,6 +22,8 @@
     "config/",
     "examples/",
     ".env.example",
-    "README.md"
+    "README.md",
+    "index.html",
+    "web/"
   ]
 }

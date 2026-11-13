@@ -24,7 +24,7 @@ function loadConfig({ env = process.env, envPath = path.resolve(__dirname, '..',
     }
     return fallback;
   };
-  const provider = setting(['LLM_PROVIDER', 'llm_provider'], 'local');
+  const provider = setting(['LLM_PROVIDER', 'llm_provider'], 'openrouter');
   if (!['local', 'openrouter'].includes(provider)) throw new Error('LLM_PROVIDER must be local or openrouter');
   const local = provider === 'local';
   const model = local
@@ -38,7 +38,8 @@ function loadConfig({ env = process.env, envPath = path.resolve(__dirname, '..',
   const baseUrl = local
     ? setting(['LOCAL_LLM_BASE_URL', 'local_llm_base_url'], 'http://localhost:1234/v1').replace(/\/$/, '') + '/chat/completions'
     : 'https://openrouter.ai/api/v1/chat/completions';
-  return { provider, model, apiKey, baseUrl };
+  return { provider, model, apiKey, baseUrl,
+    decisionApiKey: setting(['OPENROUTER_API_KEY', 'open_router']) };
 }
 
 module.exports = { parseEnv, loadConfig };

@@ -5,12 +5,11 @@
   "p": 0.15,
   "maxTicks": 20,
   "flipThreshold": 3,
-  "alpha1": 0.2,
-  "alpha2": 0,
-  "alpha3": 1,
+  "rumorBots": 6,
+  "counterRumorBots": 6,
   "seed": 42,
-  "runs": 3,
-  "callBudget": 120,
+  "runs": 1,
+  "callBudget": 2000,
   "jevThreshold": 0.5,
   "outputDir": "outputs"
 }

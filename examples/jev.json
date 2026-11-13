@@ -1,16 +1,15 @@
 {
   "mode": "jev",
-  "n": 10,
+  "n": 30,
   "k": 4,
   "p": 0.15,
-  "maxTicks": 3,
+  "maxTicks": 20,
   "flipThreshold": 3,
-  "alpha1": 0.2,
-  "alpha2": 0,
-  "alpha3": 0.4,
+  "rumorBots": 6,
+  "counterRumorBots": 6,
   "seed": 42,
   "runs": 1,
-  "callBudget": 60,
+  "callBudget": 2000,
   "jevThreshold": 0.5,
   "outputDir": "outputs"
 }
